@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lean Canvas (Editable) - Single File</title>
+  <style>
+    :root{
+      --border:#222;
+      --bg:#fff;
+      --muted:#666;
+      --pad:12px;
+      --radius:10px;
+      --minCellH:140px;
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      background:#f6f6f6;
+      font-family:var(--font);
+      color:#111;
+    }
+    header{
+      position:sticky;
+      top:0;
+      z-index:10;
+      background:rgba(246,246,246,.92);
+      backdrop-filter:saturate(150%) blur(6px);
+      border-bottom:1px solid #ddd;
+      padding:10px 14px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      flex-wrap:wrap;
+    }
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:220px;
+    }
+    .title strong{ font-size:16px; }
+    .title span{ font-size:12px; color:var(--muted); }
+    .actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    button{
+      border:1px solid #bbb;
+      background:#fff;
+      padding:8px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:13px;
+    }
+    button:hover{ background:#fafafa; }
+    button.primary{
+      border-color:#333;
+      font-weight:600;
+    }
+    button.danger{
+      border-color:#b33;
+      color:#b33;
+    }
+    main{
+      padding:14px;
+      max-width:1400px;
+      margin:0 auto;
+    }
+    .meta{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin:8px 0 12px;
+    }
+    .meta input{
+      flex:1;
+      min-width:260px;
+      border:1px solid #bbb;
+      border-radius:10px;
+      padding:10px 12px;
+      font-size:14px;
+      background:#fff;
+    }
+    .canvas{
+      background:var(--bg);
+      border:2px solid var(--border);
+      border-radius:var(--radius);
+      overflow:hidden;
+      box-shadow:0 8px 28px rgba(0,0,0,.08);
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: 1.15fr 1fr 1.2fr 1fr 1.15fr;
+      grid-template-rows: 1fr 1fr auto;
+      gap:0;
+      width:100%;
+      min-height: calc(var(--minCellH) * 2 + 120px);
+    }
+    .cell{
+      border-right:2px solid var(--border);
+      border-bottom:2px solid var(--border);
+      padding:var(--pad);
+      min-height:var(--minCellH);
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .cell:last-child{ border-right:none; }
+    .cell h3{
+      margin:0;
+      font-size:14px;
+      display:flex;
+      align-items:baseline;
+      gap:8px;
+    }
+    .cell h3 small{
+      font-size:11px;
+      color:var(--muted);
+      font-weight:500;
+    }
+    .editable{
+      flex:1;
+      border:1px dashed transparent;
+      border-radius:8px;
+      padding:8px;
+      line-height:1.45;
+      white-space:pre-wrap;
+      outline:none;
+    }
+    .editable:focus{
+      border-color:#999;
+      background:#fcfcfc;
+    }
+    /* Grid areas */
+    .problem{ grid-column:1; grid-row:1 / span 2; }
+    .solution{ grid-column:2; grid-row:1; }
+    .metrics{ grid-column:2; grid-row:2; }
+    .uvp{ grid-column:3; grid-row:1 / span 2; }
+    .advantage{ grid-column:4; grid-row:1; }
+    .channels{ grid-column:4; grid-row:2; }
+    .segments{ grid-column:5; grid-row:1 / span 2; border-right:none; }
+    .cost{ grid-column:1 / span 3; grid-row:3; min-height:140px; }
+    .revenue{ grid-column:4 / span 2; grid-row:3; min-height:140px; border-right:none; }
+
+    /* Bottom row borders cleanup */
+    .cost, .revenue{ border-bottom:none; }
+    /* Remove bottom borders for second row cells because row 3 exists; keep as is */
+    .footer-note{
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12px;
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .pill{
+      border:1px solid #ccc;
+      background:#fff;
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+      color:#333;
+    }
+    dialog{
+      border:none;
+      border-radius:14px;
+      padding:0;
+      width:min(880px, 96vw);
+      box-shadow:0 20px 70px rgba(0,0,0,.25);
+    }
+    dialog::backdrop{ background:rgba(0,0,0,.45); }
+    .modal{
+      padding:14px;
+      background:#fff;
+    }
+    .modal header{
+      position:static;
+      background:transparent;
+      border:0;
+      padding:0;
+      margin-bottom:10px;
+    }
+    .modal h2{ margin:0; font-size:16px; }
+    .modal p{ margin:8px 0; color:var(--muted); font-size:13px; }
+    textarea{
+      width:100%;
+      min-height:280px;
+      border:1px solid #bbb;
+      border-radius:12px;
+      padding:10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size:12px;
+      line-height:1.45;
+      resize:vertical;
+    }
+    .modal .row{
+      display:flex;
+      gap:8px;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    @media print{
+      /* A4ヨコ + 余白 */
+      @page{
+        size: A4 landscape;
+        margin: 8mm;
+      } /* @page/size は paged media の機能 */ /*  [oai_citation:0‡MDNウェブドキュメント](https://developer.mozilla.org/ja/docs/Web/CSS/Reference/At-rules/%40page/size?utm_source=chatgpt.com) */
+
+      /* 1ページに収めるため、印刷時だけ詰める */
+      :root{
+        --pad: 6px;
+        --minCellH: 0px;   /* ←重要：強制的な高さを解除 */
+        --printScale: 0.95;/* まだ溢れるときは 0.92, 0.90 へ */
+      }
+
+      header, .footer-note, dialog{ display:none !important; }
+      body{ background:#fff; font-size:11px; }
+      main{ padding:0; max-width:none; }
+
+      .canvas{
+        box-shadow:none; border-radius:0;
+
+        /* 安全弁：縮尺（“レイアウト幅を逆補正”して1ページに収める） */
+        width: calc(100% / var(--printScale));
+        transform: scale(var(--printScale));
+        transform-origin: top left;
+      }
+
+      .grid{ min-height: 0 !important; }
+      .cell{
+        min-height: 0 !important;
+        padding: var(--pad);
+      }
+      .cell h3{ font-size:12px; }
+      .cell h3 small{ font-size:10px; }
+      .editable{ padding:4px; border:none !important; }
+
+      /* 途中で分割されるのを抑制（保険） */
+      .canvas, .grid, .cell{
+        break-inside: avoid;
+        page-break-inside: avoid;
+      } /* break-inside / page-break-inside */ /*  [oai_citation:1‡MDNウェブドキュメント](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/break-inside?utm_source=chatgpt.com) */
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="title">
+      <strong>Lean Canvas（編集可能 / 自動保存）</strong>
+      <span>クリックして入力 → 自動保存。JSONでAIの出力を一括取り込みできます。</span>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btnExport">JSONエクスポート</button>
+      <button id="btnImport">JSONインポート</button>
+      <button id="btnPrint">印刷 / PDF</button>
+      <button class="danger" id="btnReset">リセット</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="meta">
+      <input id="projectName" placeholder="プロジェクト名（例：中小企業向けWebフィルタリングSaaS など）" />
+      <span class="pill" id="saveStatus">未保存</span>
+    </div>
+
+    <section class="canvas" aria-label="Lean Canvas">
+      <div class="grid">
+        <div class="cell problem">
+          <h3>Problem <small>上位3つ / 既存代替も</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="problem"></div>
+        </div>
+
+        <div class="cell solution">
+          <h3>Solution <small>最小機能 / MVP</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="solution"></div>
+        </div>
+
+        <div class="cell metrics">
+          <h3>Key Metrics <small>成功指標</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="metrics"></div>
+        </div>
+
+        <div class="cell uvp">
+          <h3>Unique Value Proposition <small>一言で / キャッチ</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="uvp"></div>
+        </div>
+
+        <div class="cell advantage">
+          <h3>Unfair Advantage <small>簡単に真似できない</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="advantage"></div>
+        </div>
+
+        <div class="cell channels">
+          <h3>Channels <small>獲得経路</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="channels"></div>
+        </div>
+
+        <div class="cell segments">
+          <h3>Customer Segments <small>誰のため？（早期採用者も）</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="segments"></div>
+        </div>
+
+        <div class="cell cost">
+          <h3>Cost Structure <small>主なコスト</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="cost"></div>
+        </div>
+
+        <div class="cell revenue">
+          <h3>Revenue Streams <small>課金 / 価格</small></h3>
+          <div class="editable" contenteditable="plaintext-only" data-key="revenue"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer-note">
+      <span>Tips: 箇条書きは「- 」や「• 」でOK。改行も保存されます。</span>
+      <span>保存先：このブラウザのlocalStorage（同じPC/ブラウザで復元）</span>
+    </div>
+  </main>
+
+  <dialog id="dlg">
+    <div class="modal">
+      <header>
+        <h2 id="dlgTitle">JSON</h2>
+      </header>
+      <p id="dlgHelp">
+        AIに「次のJSON形式で出して」と頼むと、そのまま貼り付けて一括反映できます。
+      </p>
+      <textarea id="jsonBox" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="btnClose">閉じる</button>
+        <button class="primary" id="btnApply">適用</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    (function(){
+      const STORAGE_KEY = "lean_canvas_singlefile_v1";
+      const $ = (sel) => document.querySelector(sel);
+      const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+      const saveStatus = $("#saveStatus");
+      const projectName = $("#projectName");
+      const editables = $$(".editable");
+
+      const dlg = $("#dlg");
+      const dlgTitle = $("#dlgTitle");
+      const dlgHelp = $("#dlgHelp");
+      const jsonBox = $("#jsonBox");
+
+      const DEFAULTS = {
+        projectName: "",
+        problem: "例:\n- 誰がどんな不便を感じている？\n- 代替手段は？（Excel/手作業/競合など）",
+        solution: "例:\n- MVPで最初に提供する3つ\n- 手作業で代替できる部分は？",
+        metrics: "例:\n- 継続率（Retention）\n- 週次アクティブ\n- 有料化率",
+        uvp: "例:\n- 「◯◯を、××なしで、最短△△で」\n- 競合と違う“刺さる一言”",
+        advantage: "例:\n- データ/流通/契約/ノウハウ\n- 参入障壁（模倣困難性）",
+        channels: "例:\n- SEO / 広告 / パートナー\n- 直販 / 代理店 / 既存顧客へのクロスセル",
+        segments: "例:\n- メイン顧客像（役職/業種/規模）\n- 早期採用者（困り度が高い層）",
+        cost: "例:\n- 開発/運用（クラウド・人件費）\n- 営業/CS\n- 広告費",
+        revenue: "例:\n- 月額課金（例: 1台あたり◯円）\n- 初期費用\n- 追加オプション"
+      };
+
+      function setStatus(text){
+        saveStatus.textContent = text;
+      }
+
+      function readState(){
+        const state = { projectName: projectName.value };
+        editables.forEach(el => state[el.dataset.key] = el.innerText.replace(/\r\n/g,"\n"));
+        return state;
+      }
+
+      function writeState(state){
+        projectName.value = state.projectName ?? "";
+        editables.forEach(el => {
+          const key = el.dataset.key;
+          el.innerText = (state[key] ?? DEFAULTS[key] ?? "").toString();
+        });
+      }
+
+      let saveTimer = null;
+      function scheduleSave(){
+        setStatus("保存中…");
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+          try{
+            const state = readState();
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            setStatus("保存済み");
+          }catch(e){
+            console.error(e);
+            setStatus("保存失敗（容量/権限）");
+          }
+        }, 250);
+      }
+
+      function load(){
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw){
+          writeState(DEFAULTS);
+          setStatus("初期状態");
+          scheduleSave();
+          return;
+        }
+        try{
+          const state = JSON.parse(raw);
+          writeState({ ...DEFAULTS, ...state });
+          setStatus("復元しました");
+        }catch(e){
+          console.error(e);
+          writeState(DEFAULTS);
+          setStatus("復元失敗→初期化");
+          scheduleSave();
+        }
+      }
+
+      // Export
+      $("#btnExport").addEventListener("click", () => {
+        const state = readState();
+        const pretty = JSON.stringify(state, null, 2);
+        dlgTitle.textContent = "JSONエクスポート";
+        dlgHelp.textContent = "このJSONをコピーして保存したり、AIに貼って改善案を出させたりできます。";
+        jsonBox.value = pretty;
+        $("#btnApply").style.display = "none";
+        dlg.showModal();
+        jsonBox.focus();
+        jsonBox.select();
+      });
+
+      // Import
+      $("#btnImport").addEventListener("click", () => {
+        dlgTitle.textContent = "JSONインポート";
+        dlgHelp.textContent =
+          "AIの出力JSONを貼り付けて「適用」。形式：{ projectName, problem, solution, metrics, uvp, advantage, channels, segments, cost, revenue }";
+        jsonBox.value = "";
+        $("#btnApply").style.display = "inline-block";
+        dlg.showModal();
+        jsonBox.focus();
+      });
+
+      $("#btnApply").addEventListener("click", () => {
+        try{
+          const obj = JSON.parse(jsonBox.value);
+          if (typeof obj !== "object" || obj === null) throw new Error("JSONがオブジェクトではありません。");
+          writeState({ ...DEFAULTS, ...obj });
+          scheduleSave();
+          dlg.close();
+        }catch(e){
+          alert("JSONの解析に失敗しました: " + e.message);
+        }
+      });
+
+      $("#btnClose").addEventListener("click", () => dlg.close());
+      dlg.addEventListener("click", (e) => {
+        // click outside to close
+        const rect = dlg.getBoundingClientRect();
+        const isInDialog =
+          rect.top <= e.clientY && e.clientY <= rect.top + rect.height &&
+          rect.left <= e.clientX && e.clientX <= rect.left + rect.width;
+        if (!isInDialog) dlg.close();
+      });
+
+      // Print / PDF
+      $("#btnPrint").addEventListener("click", () => window.print());
+
+      // Reset
+      $("#btnReset").addEventListener("click", () => {
+        if (!confirm("すべて初期化します。よろしいですか？")) return;
+        writeState(DEFAULTS);
+        localStorage.removeItem(STORAGE_KEY);
+        scheduleSave();
+      });
+
+      // Auto-save on input
+      projectName.addEventListener("input", scheduleSave);
+      editables.forEach(el => {
+        el.addEventListener("input", scheduleSave);
+        el.addEventListener("blur", scheduleSave);
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>
