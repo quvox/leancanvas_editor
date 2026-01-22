@@ -335,9 +335,15 @@
       <p id="dlgHelp">
         AIに「次のJSON形式で出して」と頼むと、そのまま貼り付けて一括反映できます。
       </p>
+      <div id="fileImportSection" style="margin-bottom: 10px;">
+        <button id="btnSelectFile">ファイルからインポート...</button>
+        <span id="fileName" style="margin-left: 8px; font-size: 12px; color: #666;"></span>
+        <input type="file" id="fileInput" accept="application/json" style="display: none;">
+      </div>
       <textarea id="jsonBox" spellcheck="false"></textarea>
       <div class="row">
         <button id="btnClose">閉じる</button>
+        <button id="btnDownload" class="primary">ダウンロード</button>
         <button class="primary" id="btnApply">適用</button>
       </div>
     </div>
@@ -357,6 +363,11 @@
       const dlgTitle = $("#dlgTitle");
       const dlgHelp = $("#dlgHelp");
       const jsonBox = $("#jsonBox");
+      const btnDownload = $("#btnDownload");
+      const fileImportSection = $("#fileImportSection");
+      const btnSelectFile = $("#btnSelectFile");
+      const fileInput = $("#fileInput");
+      const fileName = $("#fileName");
 
       const DEFAULTS = {
         projectName: "",
@@ -433,6 +444,8 @@
         dlgHelp.textContent = "このJSONをコピーして保存したり、AIに貼って改善案を出させたりできます。";
         jsonBox.value = pretty;
         $("#btnApply").style.display = "none";
+        btnDownload.style.display = "inline-block";
+        fileImportSection.style.display = "none";
         dlg.showModal();
         jsonBox.focus();
         jsonBox.select();
@@ -442,11 +455,66 @@
       $("#btnImport").addEventListener("click", () => {
         dlgTitle.textContent = "JSONインポート";
         dlgHelp.textContent =
-          "AIの出力JSONを貼り付けて「適用」。形式：{ projectName, problem, solution, metrics, uvp, advantage, channels, segments, cost, revenue }";
+          "「ファイルからインポート」するか、テキストエリアにJSONを貼り付けて「適用」してください。";
         jsonBox.value = "";
         $("#btnApply").style.display = "inline-block";
+        btnDownload.style.display = "none";
+        fileImportSection.style.display = "block";
+        fileName.textContent = "";
         dlg.showModal();
         jsonBox.focus();
+      });
+
+      btnSelectFile.addEventListener("click", () => {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+          fileName.textContent = "";
+          return;
+        }
+        fileName.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          jsonBox.value = e.target.result;
+        };
+        reader.onerror = (e) => {
+          alert("ファイルの読み込みに失敗しました。");
+          console.error(e);
+          fileName.textContent = "読込失敗";
+        };
+        reader.readAsText(file);
+        event.target.value = null;
+      });
+      
+      // Download
+      btnDownload.addEventListener("click", () => {
+        try {
+          const jsonString = jsonBox.value;
+          const blob = new Blob([jsonString], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+
+          let projectNameForFile = "leancanvas";
+          try {
+            const state = JSON.parse(jsonString);
+            if (state.projectName) {
+              projectNameForFile = state.projectName.replace(/[\s/\\?%*:|"<>]/g, "_");
+            }
+          } catch(e) { /* ignore parse error for filename */ }
+          
+          const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+          a.href = url;
+          a.download = `${projectNameForFile}_${date}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          alert("JSONのダウンロードに失敗しました: " + e.message);
+        }
       });
 
       $("#btnApply").addEventListener("click", () => {
